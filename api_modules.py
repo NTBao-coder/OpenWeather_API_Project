@@ -1,0 +1,126 @@
+import requests
+import os
+from dotenv import load_dotenv
+
+# Load các biến môi trường từ file .env
+load_dotenv()
+API_KEY = os.getenv("OPENWEATHER_API_KEY")
+
+# Hàm 1: Geocoding (Tọa độ -> Tên thành phố & Country Code)
+# Sử dụng: Reverse Geocoding API của OpenWeather.
+def get_location_info(lat, lon):
+    """
+    Lấy tên thành phố và mã quốc gia (ISO 3166-1 alpha-2) từ tọa độ.
+    Endpoint: Reverse Geocoding API
+    """
+    if not API_KEY:
+        return {"status": "error", "message": "Chưa cấu hình API Key."}
+
+    # limit=1 để chỉ lấy kết quả chính xác nhất đầu tiên
+    url = f"http://api.openweathermap.org/geo/1.0/reverse?lat={lat}&lon={lon}&limit=1&appid={API_KEY}"
+    
+    try:
+        response = requests.get(url)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if len(data) > 0:
+                city = data[0].get('name', 'Unknown')
+                country = data[0].get('country', 'Unknown')
+                return {
+                    "status": "success", 
+                    "city": city, 
+                    "country": country
+                }
+            else:
+                return {"status": "error", "message": "Không tìm thấy thông tin cho tọa độ này."}
+        elif response.status_code == 401:
+            return {"status": "error", "message": "Lỗi 401: API Key không hợp lệ."}
+        else:
+            return {"status": "error", "message": f"Lỗi hệ thống HTTP: {response.status_code}"}
+            
+    except requests.exceptions.RequestException as e:
+        return {"status": "error", "message": f"Lỗi kết nối mạng: {str(e)}"}
+    
+# Hàm 2: Current Weather (Thời tiết hiện tại)
+# Sử dụng: Current Weather API.    
+def get_current_weather(lat, lon):
+    """
+    Lấy thông tin thời tiết hiện tại dựa trên tọa độ.
+    Endpoint: Current Weather API
+    """
+    if not API_KEY:
+        return {"status": "error", "message": "Chưa cấu hình API Key."}
+
+    # Thêm units=metric để lấy độ C, lang=vi để lấy mô tả tiếng Việt
+    url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={API_KEY}&units=metric&lang=vi"
+    
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            return {
+                "status": "success",
+                "temp": data['main']['temp'],
+                "humidity": data['main']['humidity'],
+                "wind_speed": data['wind']['speed'],
+                "description": data['weather'][0]['description'].capitalize(),
+                "icon": data['weather'][0]['icon'] # Dùng để hiển thị hình ảnh trên Streamlit
+            }
+        else:
+            return {"status": "error", "message": f"Lỗi lấy thời tiết: {response.status_code}"}
+            
+    except requests.exceptions.RequestException as e:
+        return {"status": "error", "message": f"Lỗi kết nối mạng: {str(e)}"}
+
+
+# Hàm 3: Air Pollution (Chất lượng không khí)
+# Sử dụng: Air Pollution API.
+def get_air_pollution(lat, lon):
+    """
+    Lấy chỉ số chất lượng không khí (AQI).
+    Endpoint: Air Pollution API
+    """
+    if not API_KEY:
+        return {"status": "error", "message": "Chưa cấu hình API Key."}
+
+    url = f"http://api.openweathermap.org/data/2.5/air_pollution?lat={lat}&lon={lon}&appid={API_KEY}"
+    
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            # AQI có giá trị từ 1 (Tốt) đến 5 (Rất kém)
+            aqi = data['list'][0]['main']['aqi']
+            components = data['list'][0]['components'] # Chứa các chất như CO, NO2, O3...
+            return {
+                "status": "success",
+                "aqi": aqi,
+                "components": components
+            }
+        else:
+            return {"status": "error", "message": f"Lỗi lấy thông tin AQI: {response.status_code}"}
+            
+    except requests.exceptions.RequestException as e:
+        return {"status": "error", "message": f"Lỗi kết nối mạng: {str(e)}"}
+
+# Hàm 4: Forecast (Dự báo 5 ngày / 3 giờ cho phần nâng cao)
+# Sử dụng: 5 Day / 3 Hour Forecast API. 
+
+# === TEST LOGIC ===
+# Chạy thử file này độc lập để kiểm tra hàm hoạt động chưa
+if __name__ == "__main__":
+    test_lat = 10.7769
+    test_lon = 106.7009
+    
+    print("--- 1. Kiểm tra Vị trí ---")
+    print(get_location_info(test_lat, test_lon))
+    
+    print("\n--- 2. Kiểm tra Thời tiết hiện tại ---")
+    print(get_current_weather(test_lat, test_lon))
+    
+    print("\n--- 3. Kiểm tra Chất lượng không khí ---")
+    print(get_air_pollution(test_lat, test_lon))
+
+
+
