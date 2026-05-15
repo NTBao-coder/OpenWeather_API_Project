@@ -1,10 +1,58 @@
 import requests
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
 # Load các biến môi trường từ file .env
-load_dotenv()
+load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env")
 API_KEY = os.getenv("OPENWEATHER_API_KEY")
+
+
+# Hàm 0: Direct Geocoding (Tên thành phố -> Tọa độ)
+# Sử dụng: Direct Geocoding API của OpenWeather.
+def get_coordinates_by_city(city_name):
+    """
+    Lấy tọa độ từ tên thành phố.
+    Endpoint: Direct Geocoding API
+    """
+    if not API_KEY:
+        return {"status": "error", "message": "Chưa cấu hình API Key."}
+
+    city_name = city_name.strip()
+    if not city_name:
+        return {"status": "error", "message": "Vui lòng nhập tên thành phố."}
+
+    url = "https://api.openweathermap.org/geo/1.0/direct"
+    params = {
+        "q": city_name,
+        "limit": 1,
+        "appid": API_KEY,
+    }
+
+    try:
+        response = requests.get(url, params=params, timeout=10)
+
+        if response.status_code == 200:
+            data = response.json()
+            if len(data) > 0:
+                location = data[0]
+                return {
+                    "status": "success",
+                    "city": location.get("name", city_name),
+                    "country": location.get("country", "Unknown"),
+                    "state": location.get("state", ""),
+                    "lat": location["lat"],
+                    "lon": location["lon"],
+                }
+            return {"status": "error", "message": "Không tìm thấy thành phố này."}
+        elif response.status_code == 401:
+            return {"status": "error", "message": "Lỗi 401: API Key không hợp lệ."}
+        else:
+            return {"status": "error", "message": f"Lỗi tìm tọa độ: {response.status_code}"}
+
+    except requests.exceptions.RequestException as e:
+        return {"status": "error", "message": f"Lỗi kết nối mạng: {str(e)}"}
+
 
 # Hàm 1: Geocoding (Tọa độ -> Tên thành phố & Country Code)
 # Sử dụng: Reverse Geocoding API của OpenWeather.
@@ -115,12 +163,13 @@ if __name__ == "__main__":
     
     print("--- 1. Kiểm tra Vị trí ---")
     print(get_location_info(test_lat, test_lon))
+
+    print("\n--- 1b. Kiểm tra Tọa độ theo Thành phố ---")
+    print(get_coordinates_by_city("Ho Chi Minh City"))
     
     print("\n--- 2. Kiểm tra Thời tiết hiện tại ---")
     print(get_current_weather(test_lat, test_lon))
     
     print("\n--- 3. Kiểm tra Chất lượng không khí ---")
     print(get_air_pollution(test_lat, test_lon))
-
-
 
