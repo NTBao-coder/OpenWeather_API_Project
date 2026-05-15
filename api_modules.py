@@ -1,5 +1,6 @@
 import requests
 import os
+import datetime 
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -91,7 +92,6 @@ def get_location_info(lat, lon):
         return {"status": "error", "message": f"Lỗi kết nối mạng: {str(e)}"}
     
 # Hàm 2: Current Weather (Thời tiết hiện tại)
-# Sử dụng: Current Weather API.    
 def get_current_weather(lat, lon):
     """
     Lấy thông tin thời tiết hiện tại dựa trên tọa độ.
@@ -107,13 +107,25 @@ def get_current_weather(lat, lon):
         response = requests.get(url)
         if response.status_code == 200:
             data = response.json()
+            
+            # --- PHẦN XỬ LÝ MỞ RỘNG ---
+            # Chuyển đổi timestamp Unix sang định dạng giờ phút địa phương
+            sunrise_time = datetime.datetime.fromtimestamp(data['sys']['sunrise']).strftime('%H:%M')
+            sunset_time = datetime.datetime.fromtimestamp(data['sys']['sunset']).strftime('%H:%M')
+            
             return {
                 "status": "success",
                 "temp": data['main']['temp'],
                 "humidity": data['main']['humidity'],
                 "wind_speed": data['wind']['speed'],
                 "description": data['weather'][0]['description'].capitalize(),
-                "icon": data['weather'][0]['icon'] # Dùng để hiển thị hình ảnh trên Streamlit
+                "icon": data['weather'][0]['icon'],
+                # Trích xuất thêm dữ liệu cho Widgets:
+                "feels_like": data['main']['feels_like'],
+                "pressure": data['main']['pressure'],
+                "visibility": data.get('visibility', 0) / 1000, # Đổi từ mét sang km
+                "sunrise": sunrise_time,
+                "sunset": sunset_time
             }
         else:
             return {"status": "error", "message": f"Lỗi lấy thời tiết: {response.status_code}"}
@@ -154,6 +166,40 @@ def get_air_pollution(lat, lon):
 
 # Hàm 4: Forecast (Dự báo 5 ngày / 3 giờ cho phần nâng cao)
 # Sử dụng: 5 Day / 3 Hour Forecast API. 
+def get_weather_forecast(lat, lon):
+    """
+    Lấy dự báo thời tiết 5 ngày (mỗi 3 giờ).
+    Endpoint: 5 Day / 3 Hour Forecast API
+    """
+    if not API_KEY:
+        return {"status": "error", "message": "Chưa cấu hình API Key."}
+
+    url = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={API_KEY}&units=metric&lang=vi"
+    
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            forecast_list = data['list'] # Chứa 40 phần tử (5 ngày x 8 mốc/ngày)
+            
+            # Trích xuất dữ liệu thành các danh sách (lists)
+            times = [item['dt_txt'] for item in forecast_list]
+            temps = [item['main']['temp'] for item in forecast_list]
+            humidities = [item['main']['humidity'] for item in forecast_list]
+            winds = [item['wind']['speed'] for item in forecast_list]
+            
+            return {
+                "status": "success",
+                "times": times,
+                "temps": temps,
+                "humidities": humidities,
+                "winds": winds
+            }
+        else:
+            return {"status": "error", "message": f"Lỗi lấy dự báo: {response.status_code}"}
+            
+    except requests.exceptions.RequestException as e:
+        return {"status": "error", "message": f"Lỗi kết nối mạng: {str(e)}"}
 
 # === TEST LOGIC ===
 # Chạy thử file này độc lập để kiểm tra hàm hoạt động chưa
