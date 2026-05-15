@@ -45,3 +45,4 @@ pip install -r requirements.txt
 
 # 4. Khởi chạy ứng dụng
 python -m streamlit run main_app.py
+```
